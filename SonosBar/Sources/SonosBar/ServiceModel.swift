@@ -1,18 +1,53 @@
 import Foundation
 import AppKit
 
-struct SearchSection: Identifiable {
+struct SearchSection: Identifiable, Codable {
     let id: String
-    let title: String
+    /// Typen som nøgle (fx "tracks") – bruges til filtre, der skal overleve sprogskift
+    let kind: String
+    let order: Int
     let items: [ServiceItem]
+
+    var title: String { SearchKind(rawValue: kind)?.title ?? kind }
 }
 
 /// Søgeresultater fra én tjeneste
-struct ServiceResults: Identifiable {
+struct ServiceResults: Identifiable, Codable {
     let service: MusicService
     let sections: [SearchSection]
     let message: String
     var id: Int { service.id }
+}
+
+/// Søgekategorierne hedder forskelligt hos hver tjeneste ("TrackSearch", "track", "search:channel", …)
+enum SearchKind: String, CaseIterable {
+    case stations, tracks, albums, playlists, artists, shows, episodes
+
+    var order: Int { Self.allCases.firstIndex(of: self) ?? 0 }
+
+    var title: String {
+        switch self {
+        case .stations: return String(localized: "Kanaler")
+        case .tracks: return String(localized: "Numre")
+        case .albums: return String(localized: "Albums")
+        case .playlists: return String(localized: "Playlister")
+        case .artists: return String(localized: "Kunstnere")
+        case .shows: return String(localized: "Podcasts og programmer")
+        case .episodes: return String(localized: "Udsendelser")
+        }
+    }
+
+    static func of(_ c: ServiceItem) -> SearchKind? {
+        let s = (c.id + " " + c.title).lowercased()
+        if s.contains("episode") || s.contains("udsendelse") { return .episodes }
+        if s.contains("station") || s.contains("channel") || s.contains("kanal") { return .stations }
+        if s.contains("podcast") || s.contains("series") || s.contains("show") { return .shows }
+        if s.contains("track") || s.contains("song") || s.contains("nummer") { return .tracks }
+        if s.contains("album") { return .albums }
+        if s.contains("playlist") { return .playlists }
+        if s.contains("artist") { return .artists }
+        return nil
+    }
 }
 
 /// Login, søgning og afspilning fra musiktjenester som Telmore Musik og Spotify
@@ -27,6 +62,16 @@ final class ServiceModel: ObservableObject {
 
     /// Alt, der søges i
     var searchable: [MusicService] { loggedIn + enabledAnonymous }
+
+    /// Søgeresultaterne som tabel-linjer
+    var rows: [SearchRow] {
+        results.flatMap { r in
+            r.sections.flatMap { s in
+                s.items.map { SearchRow(id: "\(s.id)|\($0.id)", item: $0, service: r.service,
+                                        typeKey: s.kind, typeTitle: s.title, typeOrder: s.order) }
+            }
+        }
+    }
     @Published var query = ""
     @Published var results: [ServiceResults] = []
     @Published var isSearching = false
@@ -48,6 +93,33 @@ final class ServiceModel: ObservableObject {
 
     init(sonos: SonosModel) {
         self.sonos = sonos
+        loadLastSearch()
+    }
+
+    // MARK: - Sidste søgning gemmes, så den står der næste gang
+
+    private static var lastSearchURL: URL? {
+        guard let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
+        return dir.appendingPathComponent("SonosBar", isDirectory: true).appendingPathComponent("last-search.json")
+    }
+
+    private struct LastSearch: Codable {
+        let query: String
+        let results: [ServiceResults]
+    }
+
+    private func loadLastSearch() {
+        guard let url = Self.lastSearchURL, let data = try? Data(contentsOf: url),
+              let last = try? JSONDecoder().decode(LastSearch.self, from: data) else { return }
+        query = last.query
+        results = last.results
+    }
+
+    private func saveLastSearch() {
+        guard let url = Self.lastSearchURL,
+              let data = try? JSONEncoder().encode(LastSearch(query: query, results: results)) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url, options: .atomic)
     }
 
     // MARK: - Opsætning
@@ -183,6 +255,7 @@ final class ServiceModel: ObservableObject {
             guard query.trimmingCharacters(in: .whitespaces) == term else { return } // ny søgning startet
             results.append(found)
         }
+        saveLastSearch()
     }
 
     private func search(_ svc: MusicService, _ ctx: SMAPIContext, _ term: String) async -> ServiceResults {
@@ -192,10 +265,11 @@ final class ServiceModel: ObservableObject {
             for kind in SearchKind.allCases {
                 guard let cat = categories.first(where: { SearchKind.of($0) == kind }) else { continue }
                 let items = try await withToken(svc) { token in
-                    try await SMAPI.search(svc, ctx, category: cat.id, term: term, count: 5, token: token)
+                    try await SMAPI.search(svc, ctx, category: cat.id, term: term, count: 20, token: token)
                 }
                 if !items.isEmpty {
-                    sections.append(SearchSection(id: "\(svc.id)-\(cat.id)", title: kind.title, items: items))
+                    sections.append(SearchSection(id: "\(svc.id)-\(cat.id)", kind: kind.rawValue,
+                                                  order: kind.order, items: items))
                 }
             }
             return ServiceResults(service: svc, sections: sections,
@@ -209,6 +283,7 @@ final class ServiceModel: ObservableObject {
         query = ""
         results = []
         message = ""
+        saveLastSearch()
     }
 
     private func categoriesFor(_ svc: MusicService, _ ctx: SMAPIContext) async throws -> [ServiceItem] {
@@ -218,35 +293,6 @@ final class ServiceModel: ObservableObject {
         }
         searchCategories[svc.id] = c
         return c
-    }
-
-    /// Søgekategorierne hedder forskelligt hos hver tjeneste ("TrackSearch", "track", "search:channel", …)
-    private enum SearchKind: CaseIterable {
-        case stations, tracks, albums, playlists, artists, shows, episodes
-
-        var title: String {
-            switch self {
-            case .stations: return String(localized: "Kanaler")
-            case .tracks: return String(localized: "Numre")
-            case .albums: return String(localized: "Albums")
-            case .playlists: return String(localized: "Playlister")
-            case .artists: return String(localized: "Kunstnere")
-            case .shows: return String(localized: "Podcasts og programmer")
-            case .episodes: return String(localized: "Udsendelser")
-            }
-        }
-
-        static func of(_ c: ServiceItem) -> SearchKind? {
-            let s = (c.id + " " + c.title).lowercased()
-            if s.contains("episode") || s.contains("udsendelse") { return .episodes }
-            if s.contains("station") || s.contains("channel") || s.contains("kanal") { return .stations }
-            if s.contains("podcast") || s.contains("series") || s.contains("show") { return .shows }
-            if s.contains("track") || s.contains("song") || s.contains("nummer") { return .tracks }
-            if s.contains("album") { return .albums }
-            if s.contains("playlist") { return .playlists }
-            if s.contains("artist") { return .artists }
-            return nil
-        }
     }
 
     /// Kører et kald med tjenestens nøgle og gemmer en fornyet nøgle, hvis tjenesten sender en.

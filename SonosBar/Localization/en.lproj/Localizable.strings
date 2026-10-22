@@ -84,3 +84,21 @@
 "Kanaler" = "Stations";
 "Podcasts og programmer" = "Podcasts and shows";
 "Udsendelser" = "Episodes";
+
+/* Resultattabel */
+"Titel" = "Title";
+"Kunstner" = "Artist";
+"Album" = "Album";
+"Type" = "Type";
+"Gruppér" = "Group by";
+"Ingen gruppering" = "No grouping";
+"Filtrér i resultaterne" = "Filter results";
+"Alle typer" = "All types";
+"Udvalgte typer" = "Selected types";
+"Alle tjenester" = "All services";
+"Udvalgte tjenester" = "Selected services";
+"Vis alle" = "Show all";
+"Ukendt kunstner" = "Unknown artist";
+"Uden album" = "No album";
+"Pause" = "Pause";
+"%lld af %lld" = "%lld of %lld";

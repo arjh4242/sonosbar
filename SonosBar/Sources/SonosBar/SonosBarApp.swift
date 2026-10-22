@@ -140,7 +140,7 @@ struct ContentView: View {
         .frame(width: 320)
         .background(WindowReader(window: $window))
         .background(GeometryReader { geo in
-            Color.clear.onChange(of: geo.size) { fit(window, to: $0) }
+            Color.clear.onChange(of: geo.size) { _, size in fit(window, to: size) }
         })
         .task {
             await model.refresh()
@@ -236,15 +236,15 @@ struct SettingsView: View {
                     ForEach(AppAppearance.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: appearance) { $0.apply() }
+                .onChange(of: appearance) { _, value in value.apply() }
 
                 Picker("Sprog", selection: $language) {
                     ForEach(AppLanguage.allCases) { $0.label.tag($0) }
                 }
-                .onChange(of: language) { $0.applyAndRelaunch() }
+                .onChange(of: language) { _, value in value.applyAndRelaunch() }
 
                 Toggle("Start ved login", isOn: $launchAtLogin)
-                    .onChange(of: launchAtLogin) { setLaunchAtLogin($0) }
+                    .onChange(of: launchAtLogin) { _, on in setLaunchAtLogin(on) }
                 if loginFailed {
                     Text("Kunne ikke ændre start ved login. Ligger appen i Programmer-mappen?")
                         .font(.caption)
@@ -257,7 +257,7 @@ struct SettingsView: View {
             Section {
                 TextField("Højttaler-IP (valgfri)", text: $model.manualIP,
                           prompt: Text(verbatim: "192.168.1.20"))
-                    .onChange(of: model.manualIP) { _ in model.saveManualIP() }
+                    .onChange(of: model.manualIP) { model.saveManualIP() }
                     .onSubmit { Task { await model.refresh() } }
             } header: {
                 Text("Forbindelse")

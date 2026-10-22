@@ -5,7 +5,7 @@ import Security
 // Login sker med AppLink: brugeren logger ind i browseren, og SonosBar får sin egen nøgle
 // til at søge i kataloget. Selve afspilningen sker med den konto, der er tilknyttet i Sonos-appen.
 
-struct MusicService: Identifiable, Hashable {
+struct MusicService: Identifiable, Hashable, Codable {
     let id: Int          // Sonos' tjeneste-id ("sid"), fx 175 for Telmore Musik
     let name: String
     let endpoint: URL
@@ -23,8 +23,8 @@ struct MusicService: Identifiable, Hashable {
     }
 }
 
-struct ServiceItem: Identifiable, Equatable {
-    enum Kind { case track, album, playlist, artist, station, other }
+struct ServiceItem: Identifiable, Equatable, Codable {
+    enum Kind: String, Codable { case track, album, playlist, artist, station, other }
 
     let id: String
     let title: String

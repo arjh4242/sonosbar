@@ -48,7 +48,7 @@ SonosBar ikke finde dine højttalere.
 Mac'en skal være på samme netværk som dine Sonos-højttalere.
 Under indstillinger (tandhjulet) kan du vælge tema og sprog og slå "Start ved login" til.
 
-Kræver macOS 13 eller nyere.
+Kræver macOS 14 (Sonoma) eller nyere.
 
 
 ENGLISH
@@ -69,7 +69,7 @@ find your speakers.
 Your Mac must be on the same network as your Sonos speakers.
 In settings (the gear) you can choose theme and language and turn on "Open at login".
 
-Requires macOS 13 or later.
+Requires macOS 14 (Sonoma) or later.
 TXT
 
 # "diskutil image" afløser hdiutil i nyere macOS; ældre versioner har kun hdiutil
