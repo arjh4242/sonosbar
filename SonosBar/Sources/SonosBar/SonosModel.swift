@@ -22,6 +22,17 @@ struct NowPlaying: Equatable {
     let artURL: URL?
     /// SF Symbol der vises i stedet for et cover (fx TV)
     var symbol: String? = nil
+    /// Nummerets adresse på højttaleren (bruges til at finde cover hos musiktjenester)
+    var uri: String = ""
+
+    func with(artURL url: URL) -> NowPlaying {
+        NowPlaying(title: title, artist: artist, album: album, artURL: url, symbol: symbol, uri: uri)
+    }
+
+    /// Højttaleren kan ikke altid hente cover fra musiktjenester og giver så en /getaa-adresse, der fejler
+    var needsServiceArtwork: Bool {
+        uri.contains("sid=") && (artURL == nil || artURL?.path == "/getaa")
+    }
 }
 
 /// En favorit eller Sonos-playliste
@@ -81,6 +92,9 @@ final class SonosModel: ObservableObject {
 
     var anyPlaying: Bool { groups.contains { $0.state == .playing } }
 
+    /// Finder cover hos en musiktjeneste ud fra nummerets adresse (sættes af ServiceModel)
+    var artworkResolver: (@MainActor (String) async -> URL?)?
+
     /// Sættes af vinduet – mens det er åbent, opdateres oftere
     var isOpen = false
 
@@ -88,6 +102,11 @@ final class SonosModel: ObservableObject {
     private var pollTask: Task<Void, Never>?
     private var volumeTasks: [String: Task<Void, Never>] = [:]
     private var lastVolumeChange: [String: Date] = [:]
+    /// Lydstyrke pr. højttaler (UUID) for grupper, hvor de enkelte højttalere er foldet ud
+    @Published var speakerVolumes: [String: Int] = [:]
+    @Published var expandedGroups: Set<String> = []
+    private var speakerVolumeTasks: [String: Task<Void, Never>] = [:]
+    private var lastSpeakerChange: [String: Date] = [:]
 
     init() {
         // Find højttalerne med det samme ved opstart – ikke først når menuen åbnes
@@ -327,6 +346,10 @@ final class SonosModel: ObservableObject {
             for await (id, s) in tg { out[id] = s }
             return out
         }
+        // Find manglende covers før visningen opdateres, så de ikke blinker
+        var tracks: [String: NowPlaying?] = [:]
+        for (id, s) in snaps where s.trackOK { tracks[id] = await withArtwork(s.track) }
+
         for i in groups.indices {
             let id = groups[i].id
             guard let s = snaps[id] else { continue }
@@ -335,9 +358,16 @@ final class SonosModel: ObservableObject {
             let recentlyChanged = lastVolumeChange[id].map { Date().timeIntervalSince($0) < 2 } ?? false
             if let v = s.volume, !recentlyChanged { groups[i].volume = v }
             if let m = s.muted { groups[i].muted = m }
-            if s.trackOK { groups[i].track = s.track }
+            if let t = tracks[id] { groups[i].track = t }
             if let a = s.actions { groups[i].actions = a }
         }
+        for g in groups where expandedGroups.contains(g.id) { await loadSpeakerVolumes(g) }
+    }
+
+    private func withArtwork(_ t: NowPlaying?) async -> NowPlaying? {
+        guard let t, t.needsServiceArtwork, let resolver = artworkResolver,
+              let url = await resolver(t.uri) else { return t }
+        return t.with(artURL: url)
     }
 
     // MARK: - Kommandoer
@@ -362,6 +392,46 @@ final class SonosModel: ObservableObject {
         await run(g) { try await SonosClient.previous(g.coordinatorIP) }
     }
 
+    // MARK: - Lydstyrke pr. højttaler
+
+    func toggleExpanded(_ g: SonosGroup) {
+        if expandedGroups.remove(g.id) == nil {
+            expandedGroups.insert(g.id)
+            Task { await loadSpeakerVolumes(g) }
+        }
+    }
+
+    func loadSpeakerVolumes(_ g: SonosGroup) async {
+        for m in g.members {
+            // Overskriv ikke en slider, brugeren lige har trukket i
+            if let t = lastSpeakerChange[m.uuid], Date().timeIntervalSince(t) < 2 { continue }
+            if let v = try? await SonosClient.speakerVolume(m.ip) { speakerVolumes[m.uuid] = v }
+        }
+    }
+
+    func setSpeakerVolume(_ m: GroupMember, in g: SonosGroup, _ volume: Int) {
+        speakerVolumes[m.uuid] = volume
+        lastSpeakerChange[m.uuid] = Date()
+        // Næste ændring af gruppens slider skal tage et nyt snapshot af forholdet mellem højttalerne
+        lastVolumeChange[g.id] = nil
+
+        speakerVolumeTasks[m.uuid]?.cancel()
+        speakerVolumeTasks[m.uuid] = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 120_000_000) // debounce
+            guard !Task.isCancelled else { return }
+            do {
+                try await SonosClient.setSpeakerVolume(m.ip, volume)
+                // Gruppens samlede lydstyrke ændrer sig også
+                if let v = try? await SonosClient.groupVolume(g.coordinatorIP),
+                   let i = self?.groups.firstIndex(where: { $0.id == g.id }) {
+                    self?.groups[i].volume = v
+                }
+            } catch {
+                self?.status = String(localized: "Kunne ikke ændre lydstyrken i \(m.name).")
+            }
+        }
+    }
+
     func setVolume(_ g: SonosGroup, _ volume: Int) {
         guard let i = groups.firstIndex(where: { $0.id == g.id }) else { return }
         groups[i].volume = volume
@@ -376,6 +446,7 @@ final class SonosModel: ObservableObject {
             guard !Task.isCancelled else { return }
             do {
                 try await SonosClient.setGroupVolume(g.coordinatorIP, volume, snapshot: snapshot)
+                if self?.expandedGroups.contains(g.id) == true { await self?.loadSpeakerVolumes(g) }
             } catch {
                 self?.status = String(localized: "Kunne ikke ændre lydstyrken i \(g.name).")
             }
@@ -410,9 +481,9 @@ final class SonosModel: ObservableObject {
             groups[i].actions = a
         }
         // Nyt nummer efter næste/forrige
-        if let t = try? await SonosClient.nowPlaying(g.coordinatorIP),
-           let i = groups.firstIndex(where: { $0.id == g.id }) {
-            groups[i].track = t
+        if let t = try? await SonosClient.nowPlaying(g.coordinatorIP) {
+            let track = await withArtwork(t)
+            if let i = groups.firstIndex(where: { $0.id == g.id }) { groups[i].track = track }
         }
     }
 

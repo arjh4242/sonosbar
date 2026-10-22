@@ -54,6 +54,7 @@ enum SonosClient {
     static func nowPlaying(_ ip: String) async throws -> NowPlaying? {
         let pos = try await avTransport(ip, "GetPositionInfo", "<InstanceID>0</InstanceID>")
         let uri = XMLText.value(of: "TrackURI", in: pos) ?? ""
+        AccountNumbers.learn(from: uri)
 
         // Faste kilder uden metadata
         if uri.hasPrefix("x-sonos-htastream:") { return NowPlaying(title: "TV", artist: "", album: "", artURL: nil, symbol: "tv") }
@@ -99,7 +100,7 @@ enum SonosClient {
 
         if title.isEmpty && artist.isEmpty { return nil }
         if art.hasPrefix("/") { art = "http://\(ip):1400\(art)" }
-        return NowPlaying(title: title, artist: artist, album: album, artURL: URL(string: art))
+        return NowPlaying(title: title, artist: artist, album: album, artURL: URL(string: art), uri: uri)
     }
 
     /// "/ Christopher" eller "A / B" → "Christopher" / "A, B"
@@ -128,6 +129,19 @@ enum SonosClient {
         let v = max(0, min(100, volume))
         _ = try await groupRendering(ip, "SetGroupVolume", "<InstanceID>0</InstanceID><DesiredVolume>\(v)</DesiredVolume>")
     }
+    /// Lydstyrken på én højttaler (uanset gruppe)
+    static func speakerVolume(_ ip: String) async throws -> Int {
+        let xml = try await soap(ip, path: "/MediaRenderer/RenderingControl/Control", service: "RenderingControl",
+                                 action: "GetVolume", body: "<InstanceID>0</InstanceID><Channel>Master</Channel>")
+        guard let v = Int(XMLText.value(of: "CurrentVolume", in: xml) ?? "") else { throw SonosError.badResponse }
+        return v
+    }
+    static func setSpeakerVolume(_ ip: String, _ volume: Int) async throws {
+        _ = try await soap(ip, path: "/MediaRenderer/RenderingControl/Control", service: "RenderingControl",
+                           action: "SetVolume",
+                           body: "<InstanceID>0</InstanceID><Channel>Master</Channel><DesiredVolume>\(max(0, min(100, volume)))</DesiredVolume>")
+    }
+
     static func groupMute(_ ip: String) async throws -> Bool {
         let xml = try await groupRendering(ip, "GetGroupMute", "<InstanceID>0</InstanceID>")
         return XMLText.value(of: "CurrentMute", in: xml) == "1"
@@ -182,8 +196,8 @@ enum SonosClient {
     }
 
     /// Skifter til en indgang (TV eller line-in) og starter afspilning
-    static func play(uri: String, coordinatorIP ip: String) async throws {
-        try await setURI(ip, uri, "")
+    static func play(uri: String, metadata: String = "", coordinatorIP ip: String) async throws {
+        try await setURI(ip, uri, metadata)
         try await play(ip)
     }
 
@@ -199,6 +213,63 @@ enum SonosClient {
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
             .replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
+    // MARK: Musiktjenester
+
+    static func householdID(_ ip: String) async throws -> String {
+        let xml = try await soap(ip, path: "/DeviceProperties/Control", service: "DeviceProperties",
+                                 action: "GetHouseholdID", body: "")
+        guard let id = XMLText.value(of: "CurrentHouseholdID", in: xml) else { throw SonosError.badResponse }
+        return id
+    }
+
+    /// Højttalerens serienummer, som tjenesterne bruger som enheds-id
+    static func serialNumber(_ ip: String) async throws -> String {
+        guard let url = URL(string: "http://\(ip):1400/xml/device_description.xml") else { throw SonosError.badResponse }
+        let (data, _) = try await session.data(from: url)
+        guard let s = XMLText.value(of: "serialNum", in: String(decoding: data, as: UTF8.self)) else {
+            throw SonosError.badResponse
+        }
+        return s
+    }
+
+    static func availableServices(_ ip: String) async throws -> [MusicService] {
+        let xml = try await soap(ip, path: "/MusicServices/Control", service: "MusicServices",
+                                 action: "ListAvailableServices", body: "")
+        guard let list = XMLText.value(of: "AvailableServiceDescriptorList", in: xml) else { throw SonosError.badResponse }
+        return ServiceListParser.parse(list)
+    }
+
+    static func clearQueue(_ ip: String) async throws {
+        _ = try await avTransport(ip, "RemoveAllTracksFromQueue", "<InstanceID>0</InstanceID>")
+    }
+
+    static func enqueue(_ ip: String, uri: String, metadata: String) async throws {
+        _ = try await avTransport(ip, "AddURIToQueue", """
+            <InstanceID>0</InstanceID><EnqueuedURI>\(xmlEscape(uri))</EnqueuedURI>\
+            <EnqueuedURIMetaData>\(xmlEscape(metadata))</EnqueuedURIMetaData>\
+            <DesiredFirstTrackNumberEnqueued>0</DesiredFirstTrackNumberEnqueued><EnqueueAsNext>0</EnqueueAsNext>
+            """)
+    }
+
+    static func playQueue(_ ip: String, coordinatorUUID uuid: String) async throws {
+        try await setURI(ip, "x-rincon-queue:\(uuid)#0", "")
+        try await play(ip)
+    }
+
+    /// Adresser fra det, højttaleren spiller, har i køen og har som favoritter. Bruges til at finde
+    /// kontonummeret ("sn") for en tjeneste, som Sonos-appen har tilknyttet.
+    static func uriSamples(_ ip: String) async -> [String] {
+        var out: [String] = []
+        if let pos = try? await avTransport(ip, "GetPositionInfo", "<InstanceID>0</InstanceID>"),
+           let uri = XMLText.value(of: "TrackURI", in: pos) { out.append(uri) }
+        if let media = try? await avTransport(ip, "GetMediaInfo", "<InstanceID>0</InstanceID>"),
+           let uri = XMLText.value(of: "CurrentURI", in: media) { out.append(uri) }
+        for objectID in ["Q:0", "FV:2"] {
+            if let items = try? await browse(ip, objectID) { out += items.map(\.uri) }
+        }
+        return out
     }
 
     // MARK: Gruppering

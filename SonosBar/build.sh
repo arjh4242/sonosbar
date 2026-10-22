@@ -7,7 +7,13 @@ cd "$(dirname "$0")"
 
 VERSION="${VERSION:-1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-1}"
-SIGN_ID="${SIGN_ID:--}"
+# Uden SIGN_ID bruges et "Apple Development"-certifikat, hvis der er et. Så genkender macOS
+# appen som den samme efter hver opdatering og spørger ikke om adgang til nøgleringen igen.
+if [ -z "${SIGN_ID:-}" ]; then
+    SIGN_ID=$(security find-identity -v -p codesigning 2>/dev/null \
+        | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | head -1)
+    SIGN_ID="${SIGN_ID:--}"
+fi
 ARCHS=(--arch arm64 --arch x86_64)
 
 swift build -c release "${ARCHS[@]}"
@@ -46,11 +52,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-if [ "$SIGN_ID" = "-" ]; then
-    codesign --force --sign - "$APP"
-else
-    # Hærdet runtime + tidsstempel kræves af Apples notarisering
-    codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP"
-fi
+case "$SIGN_ID" in
+    "Developer ID"*)
+        # Hærdet runtime + tidsstempel kræves af Apples notarisering
+        codesign --force --options runtime --timestamp --sign "$SIGN_ID" "$APP" ;;
+    *)
+        codesign --force --sign "$SIGN_ID" "$APP" ;;
+esac
+echo "Signeret med: $SIGN_ID"
 echo "Færdig: $(pwd)/$APP (version $VERSION)"
 echo "Træk den til /Programmer, eller start den med: open $APP"

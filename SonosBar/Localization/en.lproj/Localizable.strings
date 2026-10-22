@@ -35,3 +35,52 @@
 "Kunne ikke styre %@. Prøv at opdatere." = "Couldn’t control %@. Try refreshing.";
 "Fandt ingen Sonos-højttalere. Prøver igen om 5 sekunder (forsøg %lld af %lld)…" = "No Sonos speakers found. Trying again in 5 seconds (attempt %lld of %lld)…";
 "Kunne ikke ændre start ved login. Ligger appen i Programmer-mappen?" = "Couldn’t change Open at login. Is the app in the Applications folder?";
+
+/* Musiktjenester */
+"Musiktjenester" = "Music services";
+"Log på en tjeneste …" = "Sign in to a service …";
+"Log af" = "Sign out";
+"Annullér" = "Cancel";
+"Log på for at kunne søge i tjenesten fra menuen. Der åbnes en side i din browser, hvor du logger ind. Musikken afspilles med den konto, der er tilknyttet i Sonos-appen." = "Sign in to search the service from the menu. A page opens in your browser where you sign in. Music plays using the account linked in the Sonos app.";
+"Log ind på %@ i browseren …" = "Sign in to %@ in your browser …";
+"Logget på %@." = "Signed in to %@.";
+"Login udløb. Prøv igen." = "Sign-in timed out. Try again.";
+"Kunne ikke logge på %@." = "Couldn’t sign in to %@.";
+"Kunne ikke hente musiktjenesterne fra højttalerne." = "Couldn’t load the music services from the speakers.";
+"Søg" = "Search";
+"Søg i %@" = "Search %@";
+"Ryd søgning" = "Clear search";
+"Numre" = "Songs";
+"Albums" = "Albums";
+"Kunstnere" = "Artists";
+"Spil i" = "Play in";
+"Spil i …" = "Play in …";
+"Ingen resultater for \"%@\"." = "No results for \"%@\".";
+"Login til %@ er udløbet. Log på igen under Indstillinger." = "Your %@ sign-in has expired. Sign in again under Settings.";
+"%@ kræver et betalt abonnement (fx Premium) for at søge via Sonos." = "%@ requires a paid subscription (e.g. Premium) to search via Sonos.";
+"%@ svarede: %@" = "%@ replied: %@";
+"Kunne ikke kontakte %@." = "Couldn’t reach %@.";
+"Der er ikke noget at afspille i \"%@\"." = "There’s nothing to play in \"%@\".";
+"Sonos kunne ikke afspille \"%@\" (fejl %lld)." = "Sonos couldn’t play \"%@\" (error %lld).";
+"Line-in (%@)" = "Line-in (%@)";
+
+/* Søgevindue */
+"Søg efter musik" = "Search for music";
+"Afspil i" = "Play in";
+"Tjeneste" = "Service";
+"Søg efter numre, albums, playlister og kunstnere." = "Search for songs, albums, playlists and artists.";
+"Spil i %@" = "Play in %@";
+"Spiller \"%@\" i %@." = "Playing \"%@\" in %@.";
+
+/* Lydstyrke pr. højttaler */
+"Vis lydstyrke for hver højttaler" = "Show volume for each speaker";
+"Skjul højttalere" = "Hide speakers";
+
+/* Tjenester uden login */
+"Tjenester uden login" = "Services without sign-in";
+"Tilføj tjeneste uden login …" = "Add a service without sign-in …";
+"Fjern" = "Remove";
+"Fx DR LYD og TuneIn. De søges i uden login. Tjenester, du har favoritter fra, kommer automatisk med." = "E.g. DR LYD and TuneIn. They’re searched without signing in. Services you have favorites from are included automatically.";
+"Kanaler" = "Stations";
+"Podcasts og programmer" = "Podcasts and shows";
+"Udsendelser" = "Episodes";
