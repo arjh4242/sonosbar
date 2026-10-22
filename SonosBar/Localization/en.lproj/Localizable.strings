@@ -1,0 +1,37 @@
+/* SonosBar – engelsk. Nøglerne er de danske tekster fra koden. */
+
+"Opdater" = "Refresh";
+"Indstillinger" = "Settings";
+"Generelt" = "General";
+"Forbindelse" = "Connection";
+"Udseende" = "Appearance";
+"System" = "System";
+"Lys" = "Light";
+"Mørk" = "Dark";
+"Sprog" = "Language";
+"Start ved login" = "Open at login";
+"Højttaler-IP (valgfri)" = "Speaker IP (optional)";
+"Kun nødvendigt hvis automatisk søgning ikke finder dine højttalere." = "Only needed if automatic discovery can’t find your speakers.";
+"Afslut SonosBar" = "Quit SonosBar";
+"Intet afspilles" = "Nothing playing";
+"Slå lyd til" = "Unmute";
+"Slå lyd fra" = "Mute";
+"Favoritter" = "Favorites";
+"Playlister" = "Playlists";
+"Kilder" = "Sources";
+"Ingen favoritter – tilføj dem i Sonos-appen" = "No favorites – add them in the Sonos app";
+"Vælg hvad der skal spilles" = "Choose what to play";
+"Spil sammen med %@" = "Play together with %@";
+"Tilføj alle" = "Add all";
+"Opløs gruppe" = "Ungroup";
+"Gruppér højttalere" = "Group speakers";
+"Kunne ikke ændre grupperingen. Prøv at opdatere." = "Couldn’t change the grouping. Try refreshing.";
+
+"Søger efter Sonos-højttalere…" = "Searching for Sonos speakers…";
+"Fandt ingen Sonos-højttalere. Tjek at Mac'en er på samme netværk, eller angiv en højttaler-IP under Indstillinger." = "No Sonos speakers found. Make sure your Mac is on the same network, or enter a speaker IP under Settings.";
+"Kunne ikke ændre lydstyrken i %@." = "Couldn’t change the volume in %@.";
+"Kunne ikke slå lyden fra/til i %@." = "Couldn’t mute/unmute %@.";
+"Den nuværende kilde i %@ understøtter ikke den handling (fx radio)." = "The current source in %@ doesn’t support that action (e.g. radio).";
+"Kunne ikke styre %@. Prøv at opdatere." = "Couldn’t control %@. Try refreshing.";
+"Fandt ingen Sonos-højttalere. Prøver igen om 5 sekunder (forsøg %lld af %lld)…" = "No Sonos speakers found. Trying again in 5 seconds (attempt %lld of %lld)…";
+"Kunne ikke ændre start ved login. Ligger appen i Programmer-mappen?" = "Couldn’t change Open at login. Is the app in the Applications folder?";

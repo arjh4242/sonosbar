@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Swift-byggefiler
+.build/
+.swiftpm/
+
+# Byggede programmer og installationssæt (laves med build.sh / make-dmg.sh)
+SonosBar/SonosBar.app/
+SonosBar/dist/
+SonosBar/Icon/AppIcon.iconset/
